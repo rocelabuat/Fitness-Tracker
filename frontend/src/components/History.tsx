@@ -3,10 +3,18 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, TrendingUp, Calendar } from "lucide-react";
 import { storageService } from "@/services/storageService";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { DailyActivity } from "@/types/fitness";
 
 export const History = () => {
   const [historyData, setHistoryData] = useState<DailyActivity[]>([]);
+  const [selectedDay, setSelectedDay] = useState<DailyActivity | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   useEffect(() => {
     setHistoryData(storageService.getHistoryData(7));
@@ -129,7 +137,7 @@ export const History = () => {
           </div>
         </div>
 
-        <div className="p-4 space-y-4">
+        <div className="p-4">
           {historyData.length === 0 ? (
             <div className="text-center py-8">
               <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
@@ -139,18 +147,22 @@ export const History = () => {
               </p>
             </div>
           ) : (
-            historyData.map((day, index) => {
-              const date = new Date(day.date);
-              const isToday = index === 0;
-              const stepPercentage = (day.steps / maxSteps) * 100;
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-5">
+              {historyData.map((day, index) => {
+                const date = new Date(day.date);
+                const isToday = index === 0;
+                const stepPercentage = (day.steps / maxSteps) * 100;
 
-              return (
-                <div
-                  key={day.date}
-                  className="flex items-center gap-4 p-3 rounded-lg hover:bg-muted/50 transition-colors"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between mb-2">
+                return (
+                  <Card
+                    key={day.date}
+                    className="w-[280px] h-[350px] p-4 shadow-card cursor-pointer hover:shadow-lg transition-shadow flex flex-col"
+                    onClick={() => {
+                      setSelectedDay(day);
+                      setDetailsOpen(true);
+                    }}
+                  >
+                    <div className="flex items-start justify-between">
                       <div>
                         <p className="font-medium text-foreground">
                           {isToday
@@ -167,32 +179,32 @@ export const History = () => {
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="font-bold text-steps">
+                        <p className="font-bold text-steps leading-tight">
                           {day.steps.toLocaleString()}
                         </p>
-                        <p className="text-sm text-muted-foreground">steps</p>
+                        <p className="text-xs text-muted-foreground">steps</p>
                       </div>
                     </div>
 
-                    {/* Progress bar */}
-                    <div className="w-full bg-muted rounded-full h-2 mb-2">
-                      <div
-                        className="bg-gradient-primary h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${Math.min(stepPercentage, 100)}%` }}
-                      />
-                    </div>
-
-                    <div className="flex justify-between text-sm text-muted-foreground">
-                      <span>{derivedDayCalories(day)} cal</span>
-                      <span>{(day.distance / 1000).toFixed(1)} km</span>
-                      {day.manualEntries.length > 0 && (
-                        <span>{day.manualEntries.length} activities</span>
-                      )}
+                    <div className="mt-3">
+                      <div className="w-full bg-muted rounded-full h-2 mb-2">
+                        <div
+                          className="bg-gradient-primary h-2 rounded-full"
+                          style={{ width: `${Math.min(stepPercentage, 100)}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>{derivedDayCalories(day)} cal</span>
+                        <span>{(day.distance / 1000).toFixed(1)} km</span>
+                        {day.manualEntries.length > 0 && (
+                          <span>{day.manualEntries.length} activities</span>
+                        )}
+                      </div>
                     </div>
 
                     {day.manualEntries.length > 0 && (
-                      <div className="mt-2 space-y-1">
-                        {day.manualEntries.map((entry) => (
+                      <div className="mt-3 space-y-2 overflow-auto">
+                        {day.manualEntries.slice(0, 5).map((entry) => (
                           <div
                             key={entry.id}
                             className="flex items-center justify-between text-sm"
@@ -208,15 +220,96 @@ export const History = () => {
                             </div>
                           </div>
                         ))}
+                        {day.manualEntries.length > 5 && (
+                          <p className="text-xs text-muted-foreground">
+                            +{day.manualEntries.length - 5} more
+                          </p>
+                        )}
                       </div>
                     )}
-                  </div>
-                </div>
-              );
-            })
+
+                    <div className="mt-auto pt-3">
+                      <Button variant="outline" size="sm" className="w-full">
+                        View details
+                      </Button>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
           )}
         </div>
       </Card>
+
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {selectedDay
+                ? new Date(selectedDay.date).toLocaleDateString("en-US", {
+                    weekday: "long",
+                    month: "short",
+                    day: "numeric",
+                  })
+                : ""}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedDay && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <Card className="p-3">
+                  <div className="text-xs text-muted-foreground">Steps</div>
+                  <div className="text-lg font-semibold text-steps">
+                    {selectedDay.steps.toLocaleString()}
+                  </div>
+                </Card>
+                <Card className="p-3">
+                  <div className="text-xs text-muted-foreground">Calories</div>
+                  <div className="text-lg font-semibold text-calories">
+                    {derivedDayCalories(selectedDay)} cal
+                  </div>
+                </Card>
+                <Card className="p-3">
+                  <div className="text-xs text-muted-foreground">Distance</div>
+                  <div className="text-lg font-semibold text-distance">
+                    {(selectedDay.distance / 1000).toFixed(2)} km
+                  </div>
+                </Card>
+              </div>
+
+              <div>
+                <div className="font-medium mb-2 text-foreground">
+                  Manual Activities
+                </div>
+                {selectedDay.manualEntries.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No manual activities recorded
+                  </p>
+                ) : (
+                  <div className="space-y-2 max-h-64 overflow-auto">
+                    {selectedDay.manualEntries.map((entry) => (
+                      <Card
+                        key={entry.id}
+                        className="p-3 flex items-center justify-between"
+                      >
+                        <div className="text-foreground">
+                          {entry.activity}{" "}
+                          <span className="text-muted-foreground">
+                            • {entry.duration} min
+                          </span>
+                        </div>
+                        <div className="text-calories font-medium">
+                          {entry.calories} cal
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
