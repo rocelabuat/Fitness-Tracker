@@ -2,29 +2,30 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { Plus, Activity, Target, Calendar } from "lucide-react";
+import { Plus, Activity, Target, Calendar, Loader2 } from "lucide-react";
 import { motionSensor } from "@/services/motionSensor";
-import { storageService } from "@/services/storageService";
-import { DailyActivity, UserProfile } from "@/types/fitness";
+import { DataConverter } from "@/services/dataConverter";
+import { useFitness } from "@/contexts/FitnessContext";
+import { DailyActivityUI } from "@/types/fitness";
 
 interface DashboardProps {
   onManualEntryClick: () => void;
 }
 
 export const Dashboard = ({ onManualEntryClick }: DashboardProps) => {
-  const [todaysActivity, setTodaysActivity] = useState<DailyActivity>(
-    storageService.getTodaysActivity()
-  );
-  const [profile, setProfile] = useState<UserProfile>(
-    storageService.getProfile()
-  );
+  const {
+    todaysActivity,
+    userProfile,
+    isLoading,
+    updateTodaysSteps,
+    isAuthenticated,
+  } = useFitness();
+
   const [isTracking, setIsTracking] = useState(false);
+  const [localSteps, setLocalSteps] = useState(0);
 
   useEffect(() => {
-    const updateActivity = () => {
-      const activity = storageService.getTodaysActivity();
-      setTodaysActivity(activity);
-    };
+    if (!isAuthenticated || !todaysActivity) return;
 
     // Set up motion sensor if supported
     const initMotionSensor = async () => {
@@ -35,8 +36,13 @@ export const Dashboard = ({ onManualEntryClick }: DashboardProps) => {
           setIsTracking(true);
 
           motionSensor.onStepUpdate((steps) => {
-            storageService.updateTodaysSteps(steps);
-            updateActivity();
+            setLocalSteps(steps);
+            // Debounce API calls to avoid too many requests
+            const timeoutId = setTimeout(() => {
+              updateTodaysSteps(steps);
+            }, 5000); // Update every 5 seconds max
+
+            return () => clearTimeout(timeoutId);
           });
         }
       }
@@ -44,22 +50,38 @@ export const Dashboard = ({ onManualEntryClick }: DashboardProps) => {
 
     initMotionSensor();
 
-    // Update activity every minute
-    const interval = setInterval(updateActivity, 60000);
-
     return () => {
-      clearInterval(interval);
       motionSensor.stopTracking();
     };
-  }, []);
+  }, [isAuthenticated, todaysActivity, updateTodaysSteps]);
 
-  const progressPercentage = (todaysActivity.steps / profile.stepGoal) * 100;
-  const today = new Date().toLocaleDateString("en-US", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background p-4 pb-20 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || !todaysActivity || !userProfile) {
+    return (
+      <div className="min-h-screen bg-background p-4 pb-20 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-muted-foreground">
+            Please sign in to view your dashboard
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const displaySteps = isTracking ? localSteps : todaysActivity.steps;
+  const progressPercentage = (displaySteps / userProfile.stepGoal) * 100;
+  const today = DataConverter.formatDate(todaysActivity.date);
+  const totalCalories = DataConverter.calculateTotalCalories(todaysActivity);
 
   return (
     <div className="min-h-screen bg-background p-4 pb-20">
@@ -80,7 +102,7 @@ export const Dashboard = ({ onManualEntryClick }: DashboardProps) => {
         <div className="text-center">
           <div className="mb-4">
             <div className="text-6xl font-bold bg-gradient-primary bg-clip-text text-transparent mb-2">
-              {todaysActivity.steps.toLocaleString()}
+              {displaySteps.toLocaleString()}
             </div>
             <p className="text-muted-foreground">steps today</p>
           </div>
@@ -92,7 +114,7 @@ export const Dashboard = ({ onManualEntryClick }: DashboardProps) => {
             />
             <p className="text-sm text-muted-foreground">
               {Math.round(progressPercentage)}% of{" "}
-              {profile.stepGoal.toLocaleString()} goal
+              {userProfile.stepGoal.toLocaleString()} goal
             </p>
           </div>
 
@@ -114,7 +136,7 @@ export const Dashboard = ({ onManualEntryClick }: DashboardProps) => {
             </div>
             <div>
               <div className="text-2xl font-bold text-calories">
-                {todaysActivity.calories}
+                {totalCalories}
               </div>
               <p className="text-sm text-muted-foreground">calories</p>
             </div>
@@ -128,7 +150,9 @@ export const Dashboard = ({ onManualEntryClick }: DashboardProps) => {
             </div>
             <div>
               <div className="text-2xl font-bold text-distance">
-                {(todaysActivity.distance / 1000).toFixed(1)}
+                {DataConverter.metersToKilometers(
+                  todaysActivity.distance
+                ).toFixed(1)}
               </div>
               <p className="text-sm text-muted-foreground">km</p>
             </div>

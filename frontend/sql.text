@@ -1,0 +1,27 @@
+-- users table
+CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  username VARCHAR(50) UNIQUE NOT NULL,
+  gender VARCHAR(10),
+  weight INTEGER,
+  height INTEGER,
+  age INTEGER,
+  step_goal INTEGER DEFAULT 10000
+);
+-- daily_activity table
+CREATE TABLE daily_activity (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id),
+  date DATE NOT NULL,
+  steps INTEGER DEFAULT 0,
+  distance INTEGER DEFAULT 0, -- in meters
+  calories INTEGER DEFAULT 0
+);
+-- manual_entries table
+CREATE TABLE manual_entries (
+  id SERIAL PRIMARY KEY,
+  daily_activity_id INTEGER REFERENCES daily_activity(id),
+  activity VARCHAR(50) NOT NULL,
+  duration INTEGER, -- in minutes
+  calories INTEGER DEFAULT 0
+);

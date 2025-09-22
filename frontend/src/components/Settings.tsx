@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,33 +11,59 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Target, User, Trash2, Save, Palette } from "lucide-react";
-import { storageService } from "@/services/storageService";
+import {
+  Target,
+  User,
+  Trash2,
+  Save,
+  Palette,
+  LogOut,
+  Loader2,
+} from "lucide-react";
 import { UserProfile } from "@/types/fitness";
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useFitness } from "@/contexts/FitnessContext";
 
 export const Settings = () => {
-  const [profile, setProfile] = useState<UserProfile>(
-    storageService.getProfile()
-  );
-  const [stepGoalInput, setStepGoalInput] = useState<string>(
-    String(storageService.getProfile().stepGoal ?? "")
-  );
-  const { toast } = useToast();
+  const { currentUser, userProfile, updateProfile, signOut, isLoading } =
+    useFitness();
 
-  const handleSave = () => {
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [stepGoalInput, setStepGoalInput] = useState<string>("");
+  const [isSaving, setIsSaving] = useState(false);
+  const { toast } = useToast();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (userProfile) {
+      setProfile(userProfile);
+      setStepGoalInput(String(userProfile.stepGoal));
+    }
+  }, [userProfile]);
+
+  const handleSave = async () => {
+    if (!profile) return;
+
     const parsedStepGoal = parseInt(stepGoalInput, 10);
     const profileToSave: UserProfile = {
       ...profile,
       stepGoal: isNaN(parsedStepGoal) ? profile.stepGoal : parsedStepGoal,
     };
-    storageService.updateProfile(profileToSave);
-    setProfile(profileToSave);
-    toast({
-      title: "Settings saved",
-      description: "Your profile has been updated successfully.",
-    });
+
+    setIsSaving(true);
+    try {
+      await updateProfile(profileToSave);
+      setProfile(profileToSave);
+    } catch (error) {
+      toast({
+        title: "Save failed",
+        description: "Failed to update profile. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleClearData = () => {
@@ -45,17 +72,44 @@ export const Settings = () => {
         "Are you sure you want to clear all fitness data? This action cannot be undone."
       )
     ) {
-      storageService.clearAllData();
-      const refreshed = storageService.getProfile();
-      setProfile(refreshed);
-      setStepGoalInput(String(refreshed.stepGoal ?? ""));
+      // Note: In a real app, you'd want to implement a clear data endpoint
       toast({
-        title: "Data cleared",
-        description: "All fitness data has been removed.",
+        title: "Feature not implemented",
+        description: "Data clearing is not available in the current version.",
         variant: "destructive",
       });
     }
   };
+
+  const handleLogout = () => {
+    if (window.confirm("Are you sure you want to sign out?")) {
+      signOut();
+      navigate("/signin");
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background p-4 pb-20 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading settings...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!profile || !currentUser) {
+    return (
+      <div className="min-h-screen bg-background p-4 pb-20 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-muted-foreground">
+            Please sign in to view settings
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background p-4 pb-20">
@@ -63,6 +117,12 @@ export const Settings = () => {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground">Settings</h1>
         <p className="text-muted-foreground">Customize your fitness tracking</p>
+        {currentUser && (
+          <p className="text-sm text-muted-foreground mt-1">
+            Signed in as:{" "}
+            <span className="font-medium">{currentUser.username}</span>
+          </p>
+        )}
       </div>
 
       {/* Theme Settings */}
@@ -222,9 +282,23 @@ export const Settings = () => {
 
       {/* Actions */}
       <div className="space-y-4">
-        <Button onClick={handleSave} className="w-full" size="lg">
-          <Save className="w-4 h-4 mr-2" />
-          Save Settings
+        <Button
+          onClick={handleSave}
+          className="w-full"
+          size="lg"
+          disabled={isSaving}
+        >
+          {isSaving ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <Save className="w-4 h-4 mr-2" />
+              Save Settings
+            </>
+          )}
         </Button>
 
         <Card className="shadow-card border-destructive/20">
@@ -244,6 +318,24 @@ export const Settings = () => {
             >
               <Trash2 className="w-4 h-4 mr-2" />
               Clear All Data
+            </Button>
+          </div>
+        </Card>
+
+        <Card className="shadow-card border-orange-200 dark:border-orange-800">
+          <div className="p-4">
+            <h3 className="font-semibold text-foreground mb-2">Account</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Sign out of your account. You can sign back in anytime.
+            </p>
+            <Button
+              onClick={handleLogout}
+              variant="outline"
+              size="sm"
+              className="w-full border-orange-200 text-orange-600 hover:bg-orange-50 dark:border-orange-800 dark:text-orange-400 dark:hover:bg-orange-950"
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              Sign Out
             </Button>
           </div>
         </Card>

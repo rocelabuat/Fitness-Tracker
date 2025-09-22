@@ -1,34 +1,71 @@
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, TrendingUp, Calendar } from "lucide-react";
-import { storageService } from "@/services/storageService";
+import { Download, TrendingUp, Calendar, Loader2 } from "lucide-react";
+import { useFitness } from "@/contexts/FitnessContext";
+import { DataConverter } from "@/services/dataConverter";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { DailyActivity } from "@/types/fitness";
+import { DailyActivityUI } from "@/types/fitness";
 
 export const History = () => {
-  const [historyData, setHistoryData] = useState<DailyActivity[]>([]);
-  const [selectedDay, setSelectedDay] = useState<DailyActivity | null>(null);
+  const { getRecentActivities, isAuthenticated, isLoading } = useFitness();
+  const [historyData, setHistoryData] = useState<DailyActivityUI[]>([]);
+  const [selectedDay, setSelectedDay] = useState<DailyActivityUI | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    setHistoryData(storageService.getHistoryData(7));
-    const refresh = () => setHistoryData(storageService.getHistoryData(7));
-    window.addEventListener("fitness-data-updated", refresh);
-    window.addEventListener("focus", refresh);
-    return () => {
-      window.removeEventListener("fitness-data-updated", refresh);
-      window.removeEventListener("focus", refresh);
-    };
-  }, []);
+    if (isAuthenticated) {
+      loadHistoryData();
+    }
+  }, [isAuthenticated]);
+
+  const loadHistoryData = async () => {
+    setLoading(true);
+    try {
+      const data = await getRecentActivities(7);
+      setHistoryData(data);
+    } catch (error) {
+      console.error("Failed to load history data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleExport = () => {
-    const csvData = storageService.exportToCsv();
+    if (historyData.length === 0) return;
+
+    const headers = [
+      "Date",
+      "Steps",
+      "Distance (km)",
+      "Calories",
+      "Manual Entries",
+    ];
+    const csvRows = [headers.join(",")];
+
+    historyData.forEach((day) => {
+      const manualEntriesCount = day.manualEntries.length;
+      const distanceKm = DataConverter.metersToKilometers(day.distance);
+      const totalCalories = DataConverter.calculateTotalCalories(day);
+
+      csvRows.push(
+        [
+          day.date,
+          day.steps.toString(),
+          distanceKm.toFixed(2),
+          totalCalories.toString(),
+          manualEntriesCount.toString(),
+        ].join(",")
+      );
+    });
+
+    const csvData = csvRows.join("\n");
     const blob = new Blob([csvData], { type: "text/csv" });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -42,13 +79,32 @@ export const History = () => {
     window.URL.revokeObjectURL(url);
   };
 
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-background p-4 pb-20 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-muted-foreground">
+            Please sign in to view your history
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading || loading) {
+    return (
+      <div className="min-h-screen bg-background p-4 pb-20 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading history...</p>
+        </div>
+      </div>
+    );
+  }
+
   const maxSteps = Math.max(...historyData.map((d) => d.steps), 1);
-  const caloriesFromSteps = (steps: number) => Math.round(steps * 0.04);
-  const derivedDayCalories = (d: DailyActivity) =>
-    caloriesFromSteps(d.steps) +
-    d.manualEntries.reduce((s, e) => s + e.calories, 0);
   const totalCalories = historyData.reduce(
-    (sum, d) => sum + derivedDayCalories(d),
+    (sum, d) => sum + DataConverter.calculateTotalCalories(d),
     0
   );
 
@@ -87,7 +143,7 @@ export const History = () => {
                 <div className="text-2xl font-bold text-calories mb-1">
                   {Math.round(
                     historyData.reduce(
-                      (sum, d) => sum + derivedDayCalories(d),
+                      (sum, d) => sum + DataConverter.calculateTotalCalories(d),
                       0
                     ) / historyData.length
                   )}
@@ -99,10 +155,9 @@ export const History = () => {
             <Card className="p-4 shadow-card">
               <div className="text-center">
                 <div className="text-2xl font-bold text-distance mb-1">
-                  {(
+                  {DataConverter.metersToKilometers(
                     historyData.reduce((sum, d) => sum + d.distance, 0) /
-                    historyData.length /
-                    1000
+                      historyData.length
                   ).toFixed(1)}
                 </div>
                 <p className="text-xs text-muted-foreground">avg km</p>
@@ -167,15 +222,10 @@ export const History = () => {
                         <p className="font-medium text-foreground">
                           {isToday
                             ? "Today"
-                            : date.toLocaleDateString("en-US", {
-                                weekday: "long",
-                              })}
+                            : DataConverter.formatWeekday(day.date)}
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          {date.toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                          })}
+                          {DataConverter.formatDateShort(day.date)}
                         </p>
                       </div>
                       <div className="text-right">
@@ -194,8 +244,15 @@ export const History = () => {
                         />
                       </div>
                       <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>{derivedDayCalories(day)} cal</span>
-                        <span>{(day.distance / 1000).toFixed(1)} km</span>
+                        <span>
+                          {DataConverter.calculateTotalCalories(day)} cal
+                        </span>
+                        <span>
+                          {DataConverter.metersToKilometers(
+                            day.distance
+                          ).toFixed(1)}{" "}
+                          km
+                        </span>
                         {day.manualEntries.length > 0 && (
                           <span>{day.manualEntries.length} activities</span>
                         )}
@@ -245,13 +302,7 @@ export const History = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {selectedDay
-                ? new Date(selectedDay.date).toLocaleDateString("en-US", {
-                    weekday: "long",
-                    month: "short",
-                    day: "numeric",
-                  })
-                : ""}
+              {selectedDay ? DataConverter.formatDate(selectedDay.date) : ""}
             </DialogTitle>
           </DialogHeader>
           {selectedDay && (
@@ -266,13 +317,16 @@ export const History = () => {
                 <Card className="p-3">
                   <div className="text-xs text-muted-foreground">Calories</div>
                   <div className="text-lg font-semibold text-calories">
-                    {derivedDayCalories(selectedDay)} cal
+                    {DataConverter.calculateTotalCalories(selectedDay)} cal
                   </div>
                 </Card>
                 <Card className="p-3">
                   <div className="text-xs text-muted-foreground">Distance</div>
                   <div className="text-lg font-semibold text-distance">
-                    {(selectedDay.distance / 1000).toFixed(2)} km
+                    {DataConverter.metersToKilometers(
+                      selectedDay.distance
+                    ).toFixed(2)}{" "}
+                    km
                   </div>
                 </Card>
               </div>
