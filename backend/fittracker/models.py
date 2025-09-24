@@ -16,6 +16,25 @@ class User(models.Model):
     def __str__(self):
         return self.username
     
+class DailyActivity(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    date = models.DateField()
+    steps = models.IntegerField()
+    distance = models.FloatField()
+    calories = models.IntegerField()
+
+    def __str__(self):
+        return f"{self.user.username} - {self.date}"
+
+class ManualEntry(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    date = models.DateField()
+    activity = models.CharField(max_length=100)
+    duration = models.IntegerField()
+    calories = models.IntegerField()
+
+    def __str__(self):
+        return f"{self.user.username} - {self.date} - {self.activity}"    
 
 
 

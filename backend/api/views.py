@@ -1,9 +1,9 @@
 #from django.shortcuts import render
 #from django.http import JsonResponse
-from fittracker.models import User
-from .serializers import UserSerializer
+from fittracker.models import User, DailyActivity, ManualEntry
+from .serializers import UserSerializer, DailyActivitySerializer, ManualEntrySerializer
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import status, generics
 from rest_framework.decorators import api_view
 # Create your views here.
 
@@ -49,4 +49,20 @@ def fittrackerDetailView(request, pk):
     if request.method == 'GET':
         serializer = UserSerializer(user)
         return Response(serializer.data, status=status.HTTP_200_OK)
+         
+class DailyActivityListCreateView(generics.ListCreateAPIView):
+    queryset = DailyActivity.objects.all()
+    serializer_class = DailyActivitySerializer
+
+class DailyActivityRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = DailyActivity.objects.all()
+    serializer_class = DailyActivitySerializer
+
+class ManualEntryListCreateView(generics.ListCreateAPIView):
+    queryset = ManualEntry.objects.all()
+    serializer_class = ManualEntrySerializer
+
+class ManualEntryRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = ManualEntry.objects.all()
+    serializer_class = ManualEntrySerializer
          
