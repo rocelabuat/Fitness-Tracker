@@ -8,6 +8,7 @@ import {
 } from '@/types/fitness';
 
 export class DataConverter {
+  
   // Convert backend User to frontend UserProfile
   static userToProfile(user: User): UserProfile {
     return {
@@ -123,11 +124,12 @@ export class DataConverter {
 
   // Format weekday
   static formatWeekday(dateString: string): string {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-    });
-  }
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-PH', {
+    weekday: 'long',
+    timeZone: 'Asia/Manila',
+  });
+}
 
   // Convert distance from meters to kilometers
   static metersToKilometers(meters: number): number {

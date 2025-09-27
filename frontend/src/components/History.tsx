@@ -205,7 +205,8 @@ export const History = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-5">
               {historyData.map((day, index) => {
                 const date = new Date(day.date);
-                const isToday = index === 0;
+                const isToday =
+                  date.toDateString() === new Date().toDateString();
                 const stepPercentage = (day.steps / maxSteps) * 100;
 
                 return (

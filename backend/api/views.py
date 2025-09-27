@@ -5,6 +5,9 @@ from .serializers import UserSerializer, DailyActivitySerializer, ManualEntrySer
 from rest_framework.response import Response
 from rest_framework import status, generics
 from rest_framework.decorators import api_view
+from django.db.models import Sum, Avg
+from django.utils.timezone import now, timedelta
+
 # Create your views here.
 
 
@@ -50,6 +53,52 @@ def fittrackerDetailView(request, pk):
         serializer = UserSerializer(user)
         return Response(serializer.data, status=status.HTTP_200_OK)
          
+@api_view(['GET'])
+def weeaklyActivityView(request, user_id):
+    end_date = now().date()
+    start_date = end_date - timedelta(days=7)
+
+    # DailyActivity: filter by user and date
+    daily_qs = DailyActivity.objects.filter(
+        user_id=user_id,
+        date__range=[start_date, end_date]
+    )
+
+    # ManualEntry: filter by user and date
+    manual_qs = ManualEntry.objects.filter(
+        user_id=user_id,
+        date__range=[start_date, end_date]
+    )
+
+    # Average steps and distance from DailyActivity only
+    avg_steps = daily_qs.aggregate(avg_steps=Avg('steps'))['avg_steps'] or 0
+    avg_distance = daily_qs.aggregate(avg_distance=Avg('distance'))['avg_distance'] or 0
+
+    # Calories from both DailyActivity and ManualEntry
+    daily_calories = daily_qs.aggregate(sum_cal=Sum('calories'), avg_cal=Avg('calories'))
+    manual_calories = manual_qs.aggregate(sum_cal=Sum('calories'), avg_cal=Avg('calories'))
+
+    total_calories = (daily_calories['sum_cal'] or 0) + (manual_calories['sum_cal'] or 0)
+
+    # Average calories: weighted by number of entries
+    daily_count = daily_qs.count()
+    manual_count = manual_qs.count()
+    total_count = daily_count + manual_count
+
+    avg_calories = 0
+    if total_count > 0:
+        avg_calories = (
+            ((daily_calories['sum_cal'] or 0) + (manual_calories['sum_cal'] or 0)) / total_count
+        )
+
+    stats = {
+        'average_steps': avg_steps,
+        'average_distance': avg_distance,
+        'average_calories': avg_calories,
+        'total_calories': total_calories,
+    }
+    return Response(stats, status=status.HTTP_200_OK)
+
 class DailyActivityListCreateView(generics.ListCreateAPIView):
     queryset = DailyActivity.objects.all()
     serializer_class = DailyActivitySerializer
@@ -65,4 +114,17 @@ class ManualEntryListCreateView(generics.ListCreateAPIView):
 class ManualEntryRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = ManualEntry.objects.all()
     serializer_class = ManualEntrySerializer
-         
+
+class DailyActivityByUserView(generics.ListAPIView):
+    serializer_class = DailyActivitySerializer
+
+    def get_queryset(self):
+        user_id = self.kwargs['user_id']
+        return DailyActivity.objects.filter(user_id=user_id)
+
+class ManualEntryByUserView(generics.ListAPIView):
+    serializer_class = ManualEntrySerializer
+
+    def get_queryset(self):
+        user_id = self.kwargs['user_id']
+        return ManualEntry.objects.filter(user_id=user_id)
