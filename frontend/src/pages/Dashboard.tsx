@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { Plus, Activity, Target, Calendar, Loader2 } from "lucide-react";
+import { Plus, Activity, Target, Loader2 } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { motionSensor } from "@/services/motionSensor";
 import { DataConverter } from "@/services/dataConverter";
@@ -102,10 +102,6 @@ export const Dashboard = ({ onManualEntryClick }: DashboardProps) => {
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-2xl font-bold text-foreground">FitTracker</h1>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Calendar className="w-4 h-4" />
-              {isTracking ? "Live tracking" : "Manual entry"}
-            </div>
             <ThemeToggle />
           </div>
         </div>

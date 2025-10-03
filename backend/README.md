@@ -1,218 +1,119 @@
-# Fitness Tracker Django Backend
+## Fitness Tracker Backend (Django + DRF)
 
-A Django REST API backend for a fitness tracking application with full CRUD operations.
+This is the backend for the Fitness Tracker app, built with Django 5 and Django REST Framework.
 
-## Features
+### Prerequisites
 
-- **User Management**: Create, read, update, and delete user profiles
-- **Daily Activity Tracking**: Record daily steps, distance, and calories
-- **Manual Entry System**: Add custom activities with duration and calories
-- **RESTful API**: Complete CRUD operations with proper HTTP status codes
-- **Data Validation**: Comprehensive input validation and error handling
-- **CORS Support**: Configured for frontend integration
-- **Pagination**: Built-in pagination for better performance
+- Python 3.12
+- PowerShell (Windows)
 
-## Database Schema
+### Get Started (Windows)
 
-### Users Table
+1. Open PowerShell and navigate to the backend folder:
+   ```bash
+   cd backend
+   ```
+2. Activate the existing virtual environment (recommended):
+   ```bash
+   .\venv\Scripts\activate
+   ```
+   If you don't want to use the provided venv, create and activate your own:
+   ```bash
+   python -m venv venv
+   .\venv\Scripts\activate
+   ```
+3. Install dependencies (if needed):
+   ```bash
+   pip install django==5.2.6 djangorestframework==3.16.1
+   ```
+4. Apply migrations:
+   ```bash
+   python manage.py migrate
+   ```
+5. Run the development server:
+   ```bash
+   python manage.py runserver
+   ```
 
-- `id`: Primary key
-- `username`: Unique username (3-50 characters)
-- `gender`: M/F/ (optional)
-- `weight`: Weight in kg (20-300)
-- `height`: Height in cm (100-250)
-- `age`: Age in years (1-150)
-- `step_goal`: Daily step goal (1000-100000, default: 10000)
+Server runs at `http://127.0.0.1:8000/` by default.
 
-### Daily Activity Table
+### Project Structure
 
-- `id`: Primary key
-- `user_id`: Foreign key to users
-- `date`: Activity date (no future dates)
-- `steps`: Number of steps (0-100000)
-- `distance`: Distance in meters (0-1000000)
-- `calories`: Calories burned (0-10000)
+- `django_rest_main/` – Django project config (root URLs, settings)
+- `api/` – REST API app (serializers, views, API URLs)
+- `fittracker/` – Core models app
 
-### Manual Entries Table
+### Base URL Prefixes
 
-- `id`: Primary key
-- `daily_activity_id`: Foreign key to daily_activity
-- `activity`: Activity name (2-50 characters)
-- `duration`: Duration in minutes (0-1440, optional)
-- `calories`: Calories burned (0-5000)
+- Admin: `/admin/`
+- Fitness models app: `/fittracker/` (app-specific URLs; see `fittracker/urls.py` if needed)
+- REST API: `/api/`
 
-## Setup Instructions
+### API Endpoints (under `/api/`)
 
-### 1. Install Dependencies
+Users
 
-```bash
-cd backend
-pip install -r requirements.txt
+- `GET /add-user/` – List users
+- `POST /add-user/` – Create user
+- `POST /login/` – Login
+- `GET /update-user/<pk>/` – Retrieve user
+- `PATCH /update-user/<pk>/` – Partially update user (`age`, `height`, `weight`, `gender`, `step_goal`)
+
+Daily Activity
+
+- `GET /daily-activity/` – List daily activities
+- `POST /daily-activity/` – Create daily activity
+- `GET /daily-activity/<pk>/` – Retrieve
+- `PUT /daily-activity/<pk>/` – Update
+- `PATCH /daily-activity/<pk>/` – Partial update
+- `DELETE /daily-activity/<pk>/` – Delete
+- `GET /daily-activity/user/<user_id>/` – List daily activities for a user
+
+Manual Entry
+
+- `GET /manual-entry/` – List manual entries
+- `POST /manual-entry/` – Create manual entry
+- `GET /manual-entry/<pk>/` – Retrieve
+- `PUT /manual-entry/<pk>/` – Update
+- `PATCH /manual-entry/<pk>/` – Partial update
+- `DELETE /manual-entry/<pk>/` – Delete
+- `GET /manual-entry/user/<user_id>/` – List manual entries for a user
+
+Aggregations & Utilities
+
+- `GET /weekly-activity/<user_id>/` – Weekly summary for a user (averages for steps, distance, calories; total calories)
+- `DELETE /history/user/<user_id>/` – Delete all history (daily activities + manual entries) for a user
+- `DELETE /delete-activity/<user_id>/` – Deletes a single activity for a user, requires `id` and `type` (`daily` or `manual`) in the request body.
+
+### Example Requests
+
+Using PowerShell curl alias (`curl` maps to `Invoke-WebRequest`). For raw body posting, prefer `Invoke-RestMethod`:
+
+```powershell
+# List users
+Invoke-RestMethod -Method GET http://127.0.0.1:8000/api/fittracker/
+
+# Create user
+Invoke-RestMethod -Method POST \
+  -Uri http://127.0.0.1:8000/api/fittracker/ \
+  -ContentType 'application/json' \
+  -Body (@{ age=25; height=175; weight=70; gender='male'; step_goal=8000 } | ConvertTo-Json)
+
+# Weekly summary
+Invoke-RestMethod -Method GET http://127.0.0.1:8000/api/weekly-activity/1/
 ```
 
-### 2. Database Setup
-
-```bash
-# Create and apply migrations
-python manage.py makemigrations
-python manage.py migrate
-
-# Create superuser (optional)
-python manage.py createsuperuser
-```
-
-### 3. Populate Test Data (Optional)
-
-```bash
-# Create test users with sample data
-python manage.py populate_test_data --users 3
-```
-
-### 4. Run Development Server
-
-```bash
-python manage.py runserver
-```
-
-The API will be available at `http://localhost:8000/api/`
-
-## API Endpoints
-
-### Users
-
-- `GET /api/users/` - List all users
-- `POST /api/users/` - Create new user
-- `GET /api/users/{id}/` - Get user details
-- `PUT /api/users/{id}/` - Update user
-- `DELETE /api/users/{id}/` - Delete user
-- `GET /api/users/{id}/activities/` - Get user's activities
-- `GET /api/users/{id}/recent/` - Get recent activities (last 7 days)
-
-### Daily Activities
-
-- `GET /api/daily-activities/` - List activities
-- `POST /api/daily-activities/` - Create activity
-- `GET /api/daily-activities/{id}/` - Get activity details
-- `PUT /api/daily-activities/{id}/` - Update activity
-- `DELETE /api/daily-activities/{id}/` - Delete activity
-- `GET /api/daily-activities/by-date-range/` - Filter by date range
-
-### Manual Entries
-
-- `GET /api/manual-entries/` - List manual entries
-- `POST /api/manual-entries/` - Create manual entry
-- `GET /api/manual-entries/{id}/` - Get entry details
-- `PUT /api/manual-entries/{id}/` - Update entry
-- `DELETE /api/manual-entries/{id}/` - Delete entry
-- `GET /api/manual-entries/by-user/` - Filter by user
-- `GET /api/manual-entries/by-activity-type/` - Filter by activity type
-
-## Query Parameters
-
-### Users
-
-- `username`: Filter by username (case-insensitive partial match)
-
-### Daily Activities
-
-- `user_id`: Filter by user ID
-- `date`: Filter by specific date
-- `start_date` & `end_date`: Filter by date range
-
-### Manual Entries
-
-- `daily_activity_id`: Filter by daily activity ID
-- `activity`: Filter by activity name (case-insensitive partial match)
-- `user_id`: Filter by user ID (via daily activity)
-- `activity_type`: Filter by activity type
-
-## Example API Usage
-
-### Create a User
-
-```bash
-curl -X POST http://localhost:8000/api/users/ \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "john_doe",
-    "gender": "M",
-    "weight": 75,
-    "height": 180,
-    "age": 30,
-    "step_goal": 12000
-  }'
-```
-
-### Create Daily Activity
-
-```bash
-curl -X POST http://localhost:8000/api/daily-activities/ \
-  -H "Content-Type: application/json" \
-  -d '{
-    "user": 1,
-    "date": "2024-01-15",
-    "steps": 8500,
-    "distance": 6000,
-    "calories": 2200
-  }'
-```
-
-### Create Manual Entry
-
-```bash
-curl -X POST http://localhost:8000/api/manual-entries/ \
-  -H "Content-Type: application/json" \
-  -d '{
-    "daily_activity": 1,
-    "activity": "Running",
-    "duration": 30,
-    "calories": 300
-  }'
-```
-
-## Configuration
-
-### CORS Settings
-
-The backend is configured to allow all origins for development. For production, update the CORS settings in `settings.py`:
-
-```python
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
-```
-
-### Pagination
-
-Default page size is set to 20 items. This can be customized in the REST framework settings.
-
-## Testing
-
-Run the test suite:
+### Running Tests
 
 ```bash
 python manage.py test
 ```
 
-## Admin Interface
+### Notes
 
-Access the Django admin interface at `http://localhost:8000/admin/` to manage data through the web interface.
-
-## Production Deployment
-
-For production deployment:
-
-1. Set `DEBUG = False` in settings
-2. Configure proper database (PostgreSQL recommended)
-3. Set up proper CORS origins
-4. Configure static file serving
-5. Set up proper authentication and permissions
-6. Use environment variables for sensitive settings
-
-## Dependencies
-
-- Django 5.2.6
-- Django REST Framework 3.16.1
-- django-cors-headers 4.9.0
-- SQLite (development) / PostgreSQL (production)
+- All responses are JSON.
+- Authentication is not configured in this snapshot; add DRF auth if needed.
+- For additional URLs, see:
+  - `django_rest_main/urls.py`
+  - `api/urls.py`
+  - `api/views.py`

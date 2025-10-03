@@ -6,7 +6,9 @@ from rest_framework.response import Response
 from rest_framework import status, generics
 from rest_framework.decorators import api_view
 from django.db.models import Sum, Avg
-from django.utils.timezone import now, timedelta
+from django.utils.timezone import now
+from datetime import timedelta
+from django.contrib.auth import authenticate
 
 # Create your views here.
 
@@ -15,7 +17,7 @@ from django.utils.timezone import now, timedelta
 #post use to submit data to the server
 #get use to fetch data from the server
 
-def fittrackerView(request):
+def addUser(request):
     if request.method == 'GET':
         users = User.objects.all()
         serializer = UserSerializer(users, many=True)
@@ -30,7 +32,7 @@ def fittrackerView(request):
 
 
 @api_view(['GET', 'PATCH'])
-def fittrackerDetailView(request, pk):
+def updateUserView(request, pk):
     try:
         user = User.objects.get(pk=pk)
     except User.DoesNotExist:
@@ -99,6 +101,18 @@ def weeaklyActivityView(request, user_id):
     }
     return Response(stats, status=status.HTTP_200_OK)
 
+@api_view(['POST'])
+def login_view(request):
+    username = request.data.get('username')
+    password = request.data.get('password')
+    if not username or not password:
+        return Response({'detail': 'username and password are required.'}, status=status.HTTP_400_BAD_REQUEST)
+    user = authenticate(request, username=username, password=password)
+    if user is None:
+        return Response({'detail': 'Invalid credentials.'}, status=status.HTTP_401_UNAUTHORIZED)
+    serializer = UserSerializer(user)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
 class DailyActivityListCreateView(generics.ListCreateAPIView):
     queryset = DailyActivity.objects.all()
     serializer_class = DailyActivitySerializer
@@ -128,3 +142,30 @@ class ManualEntryByUserView(generics.ListAPIView):
     def get_queryset(self):
         user_id = self.kwargs['user_id']
         return ManualEntry.objects.filter(user_id=user_id)
+
+
+@api_view(['DELETE'])
+def deleteActivity(request, pk):
+    """
+    Delete all DailyActivity and ManualEntry records for a user.
+    pk: user id
+    """
+    try:
+        # Delete all daily activities for the user
+        daily_deleted, _ = DailyActivity.objects.filter(user_id=pk).delete()
+        
+        # Delete all manual entries for the user
+        manual_deleted, _ = ManualEntry.objects.filter(user_id=pk).delete()
+        
+        return Response({
+            'detail': 'All activities deleted successfully.',
+            'daily_deleted': daily_deleted,
+            'manual_deleted': manual_deleted
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({
+            'detail': f'Error deleting activities: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+

@@ -7,11 +7,11 @@ class User(models.Model):
     email = models.CharField(max_length=100)
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
-    age = models.IntegerField()
-    height = models.IntegerField()
-    weight = models.IntegerField()
-    gender = models.CharField(max_length=100)
-    step_goal = models.IntegerField(default=10000)
+    age = models.IntegerField(null=True)
+    height = models.IntegerField(null=True)
+    weight = models.IntegerField(null=True)
+    gender = models.CharField(max_length=100, null=True)
+    step_goal = models.IntegerField(default=10000, null=True)
 
     def __str__(self):
         return self.username
@@ -35,7 +35,6 @@ class ManualEntry(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.date} - {self.activity}"    
-
 
 
 

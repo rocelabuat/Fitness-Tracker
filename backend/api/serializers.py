@@ -5,6 +5,9 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ('id','username', 'password', 'first_name', 'last_name', 'email', 'gender', 'age', 'height', 'weight', 'step_goal')
+        extra_kwargs = {
+            'password': {'write_only': True}
+        }
 
 class DailyActivitySerializer(serializers.ModelSerializer):
     class Meta:
