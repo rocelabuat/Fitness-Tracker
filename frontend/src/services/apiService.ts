@@ -1,6 +1,7 @@
 import { User, DailyActivity, ManualEntry, AuthUser, LoginRequest } from '@/types/fitness';
 
-const API_BASE_URL = 'http://127.0.0.1:8000/api';
+// Use localhost to ensure SameSite=Lax cookies work in dev
+const API_BASE_URL = 'http://localhost:8000/api';
 
 class ApiService {
   private async request<T>(
@@ -13,6 +14,8 @@ class ApiService {
         'Content-Type': 'application/json',
         ...options.headers,
       },
+      // Always include cookies for session-auth endpoints
+      credentials: 'include',
       ...options,
     };
 
@@ -28,10 +31,11 @@ class ApiService {
 
   // Authentication (explicit absolute URL per requirement)
   async authenticateUser(loginData: LoginRequest): Promise<User> {
-    const url = 'http://127.0.0.1:8000/api/login/';
+    const url = 'http://localhost:8000/api/login/';
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify(loginData),
     });
     if (!response.ok) {

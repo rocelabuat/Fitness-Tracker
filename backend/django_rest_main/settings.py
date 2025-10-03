@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-r(ri-ph%p@#csr)lot9y6(5dgeud*e7nwxezlt4h0ms-$@6zbf
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
 
 # Application definition
@@ -132,4 +132,22 @@ AUTHENTICATION_BACKENDS = [
     'fittracker.auth_backend.FitTrackerBackend',
 ]
 
-CORS_ALLOW_ALL_ORIGINS = True
+# CORS/CSRF settings for credentialed frontend requests in development
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",  # Vite default dev server
+    "http://127.0.0.1:5173",
+]
+
+# Allow cookies to be sent from localhost dev
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
+# Session cookie settings suitable for local dev with http
+SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SECURE = False
