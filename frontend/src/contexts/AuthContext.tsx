@@ -6,6 +6,7 @@ import React, {
   ReactNode,
 } from "react";
 import { AuthUser } from "@/types/fitness";
+import { apiService } from "@/services/apiService";
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -19,7 +20,7 @@ interface AuthContextType {
 interface RegisterData {
   username: string;
   password: string;
-  gender?: "male" | "female";
+  gender?: "M" | "F";
   weight?: number;
   height?: number;
   age?: number;
@@ -64,23 +65,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   ): Promise<boolean> => {
     setIsLoading(true);
     try {
-      // TODO: Replace with actual API call
-      // For now, simulate API call with mock data
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Mock successful login
-      const mockUser: AuthUser = {
-        id: 1,
+      const loggedInUser = await apiService.authenticateUser({
         username,
-        gender: "male",
-        weight: 70,
-        height: 175,
-        age: 25,
-        step_goal: 10000,
-      };
-
-      setUser(mockUser);
-      localStorage.setItem("fitness_user", JSON.stringify(mockUser));
+        password,
+      });
+      // Align to AuthUser shape (backend returns compatible fields)
+      const authUser: AuthUser = loggedInUser;
+      setUser(authUser);
+      localStorage.setItem("fitness_user", JSON.stringify(authUser));
       return true;
     } catch (error) {
       console.error("Login error:", error);

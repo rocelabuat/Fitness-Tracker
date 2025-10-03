@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Plus, Activity, Target, Calendar, Loader2 } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { motionSensor } from "@/services/motionSensor";
 import { DataConverter } from "@/services/dataConverter";
 import { useFitness } from "@/contexts/FitnessContext";
@@ -66,13 +67,24 @@ export const Dashboard = ({ onManualEntryClick }: DashboardProps) => {
     );
   }
 
-  if (!isAuthenticated || !todaysActivity || !userProfile) {
+  if (!isAuthenticated || !userProfile) {
     return (
       <div className="min-h-screen bg-background p-4 pb-20 flex items-center justify-center">
         <div className="text-center">
           <p className="text-muted-foreground">
             Please sign in to view your dashboard
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!todaysActivity) {
+    return (
+      <div className="min-h-screen bg-background p-4 pb-20 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading today's activity...</p>
         </div>
       </div>
     );
@@ -89,9 +101,12 @@ export const Dashboard = ({ onManualEntryClick }: DashboardProps) => {
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-2xl font-bold text-foreground">FitTracker</h1>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Calendar className="w-4 h-4" />
-            {isTracking ? "Live tracking" : "Manual entry"}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Calendar className="w-4 h-4" />
+              {isTracking ? "Live tracking" : "Manual entry"}
+            </div>
+            <ThemeToggle />
           </div>
         </div>
         <p className="text-muted-foreground">{today}</p>
@@ -150,9 +165,7 @@ export const Dashboard = ({ onManualEntryClick }: DashboardProps) => {
             </div>
             <div>
               <div className="text-2xl font-bold text-distance">
-                {DataConverter.metersToKilometers(
-                  todaysActivity.distance
-                ).toFixed(1)}
+                {todaysActivity.distance.toFixed(1)}
               </div>
               <p className="text-sm text-muted-foreground">km</p>
             </div>

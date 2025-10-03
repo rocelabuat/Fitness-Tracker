@@ -6,7 +6,8 @@ import React, {
   ReactNode,
 } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { localStorageService as apiService } from "@/services/localStorageService";
+import { localStorageService as localApi } from "@/services/localStorageService";
+import { apiService } from "@/services/apiService";
 import { DataConverter } from "@/services/dataConverter";
 import {
   User,
@@ -117,7 +118,25 @@ export const FitnessProvider: React.FC<FitnessProviderProps> = ({
     queryKey: ["todaysActivity", currentUser?.id],
     queryFn: async () => {
       if (!currentUser) return null;
-      return apiService.getOrCreateTodayActivity(currentUser.id);
+
+      const activity = await apiService.getOrCreateTodayActivity(
+        currentUser.id
+      );
+
+      // Fetch today's manual entries
+      const today = DataConverter.getTodayDate();
+      const manualEntries = await apiService.getManualEntriesByUser(
+        currentUser.id
+      );
+      const todaysManualEntries = manualEntries.filter(
+        (entry) => entry.date === today
+      );
+
+      // Attach manual entries to the activity
+      return {
+        ...activity,
+        manual_entries: todaysManualEntries,
+      };
     },
     enabled: !!currentUser,
     refetchInterval: 60000, // Refetch every minute
@@ -207,12 +226,16 @@ export const FitnessProvider: React.FC<FitnessProviderProps> = ({
       if (!currentUser || !todaysActivityData)
         throw new Error("No user or activity");
 
-      // Calculate distance based on steps (rough estimate: 0.7m per step)
-      const distance = Math.round(steps * 0.7);
+      // Calculate distance based on steps (rough estimate: 0.7m per step, convert to km)
+      const distance = Math.round(((steps * 0.7) / 1000) * 100) / 100; // Convert to km with 2 decimal places
+
+      // Calculate calories from steps (rough estimate: 0.04 calories per step)
+      const calories = Math.round(steps * 0.04);
 
       return apiService.updateDailyActivity(todaysActivityData.id, {
         steps,
         distance,
+        calories,
       });
     },
     onSuccess: () => {
@@ -233,10 +256,11 @@ export const FitnessProvider: React.FC<FitnessProviderProps> = ({
       if (!currentUser || !todaysActivityData)
         throw new Error("No user or activity");
 
-      const entryData: CreateManualEntryRequest = {
-        daily_activity: todaysActivityData.id,
+      const entryData = {
+        user: currentUser.id,
+        date: todaysActivityData.date,
         activity: entry.activity,
-        duration: entry.duration || undefined,
+        duration: entry.duration || 0,
         calories: entry.calories,
       };
 
@@ -244,6 +268,7 @@ export const FitnessProvider: React.FC<FitnessProviderProps> = ({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["todaysActivity"] });
+      queryClient.invalidateQueries({ queryKey: ["currentUser"] });
       toast({
         title: "Activity added",
         description: "Your activity has been recorded successfully.",
@@ -316,11 +341,37 @@ export const FitnessProvider: React.FC<FitnessProviderProps> = ({
     startDate.setDate(startDate.getDate() - days);
     const startDateStr = startDate.toISOString().split("T")[0];
 
-    const activities = await apiService.getDailyActivitiesByDateRange(
-      startDateStr,
-      endDate
+    // Fetch both daily activities and manual entries
+    const [activities, manualEntries] = await Promise.all([
+      apiService.getDailyActivitiesByDateRange(startDateStr, endDate),
+      apiService.getManualEntriesByUser(currentUser.id),
+    ]);
+
+    // Filter manual entries by date range
+    const filteredManualEntries = manualEntries.filter(
+      (entry) => entry.date >= startDateStr && entry.date <= endDate
     );
-    return DataConverter.dailyActivitiesToUI(activities);
+
+    // Group manual entries by date
+    const manualEntriesByDate = filteredManualEntries.reduce((acc, entry) => {
+      if (!acc[entry.date]) {
+        acc[entry.date] = [];
+      }
+      acc[entry.date].push(entry);
+      return acc;
+    }, {} as Record<string, ManualEntry[]>);
+
+    // Convert activities to UI format and attach manual entries
+    const activitiesWithManualEntries = activities.map((activity) => {
+      const uiActivity = DataConverter.dailyActivityToUI(activity);
+      const manualEntriesForDate = manualEntriesByDate[activity.date] || [];
+      uiActivity.manualEntries = manualEntriesForDate.map((entry) =>
+        DataConverter.manualEntryToUI(entry)
+      );
+      return uiActivity;
+    });
+
+    return activitiesWithManualEntries;
   };
 
   const refreshData = () => {

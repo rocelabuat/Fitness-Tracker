@@ -25,7 +25,8 @@ export interface DailyActivity {
 
 export interface ManualEntry {
   id: number;
-  daily_activity: number; // daily activity ID
+  user: number; // user ID
+  date: string; // YYYY-MM-DD format
   activity: string; // activity name (2-50 characters)
   duration?: number; // minutes (0-1440, optional)
   calories: number; // 0-5000
@@ -105,7 +106,8 @@ export interface CreateDailyActivityRequest {
 }
 
 export interface CreateManualEntryRequest {
-  daily_activity: number;
+  user: number;
+  date: string;
   activity: string;
   duration?: number;
   calories: number;
@@ -133,7 +135,8 @@ export interface UpdateDailyActivityRequest {
 }
 
 export interface UpdateManualEntryRequest {
-  daily_activity?: number;
+  user?: number;
+  date?: string;
   activity?: string;
   duration?: number;
   calories?: number;

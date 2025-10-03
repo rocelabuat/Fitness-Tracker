@@ -12,18 +12,22 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import {
-  Target,
-  User,
-  Trash2,
-  Save,
-  Palette,
-  LogOut,
-  Loader2,
-} from "lucide-react";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Target, User, Trash2, Save, LogOut, Loader2 } from "lucide-react";
 import { UserProfile } from "@/types/fitness";
 import { useToast } from "@/hooks/use-toast";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { useFitness } from "@/contexts/FitnessContext";
+import { apiService } from "@/services/apiService";
+import { useQueryClient } from "@tanstack/react-query";
 
 export const Settings = () => {
   const { currentUser, userProfile, updateProfile, signOut, isLoading } =
@@ -34,6 +38,7 @@ export const Settings = () => {
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (userProfile) {
@@ -43,7 +48,7 @@ export const Settings = () => {
   }, [userProfile]);
 
   const handleSave = async () => {
-    if (!profile) return;
+    if (!profile || !currentUser) return;
 
     const parsedStepGoal = parseInt(stepGoalInput, 10);
     const profileToSave: UserProfile = {
@@ -55,10 +60,15 @@ export const Settings = () => {
     try {
       await updateProfile(profileToSave);
       setProfile(profileToSave);
-    } catch (error) {
+      toast({
+        title: "Profile updated",
+        description: "Your profile has been updated successfully.",
+      });
+    } catch (error: any) {
       toast({
         title: "Save failed",
-        description: "Failed to update profile. Please try again.",
+        description:
+          error.message || "Failed to update profile. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -66,26 +76,34 @@ export const Settings = () => {
     }
   };
 
-  const handleClearData = () => {
-    if (
-      window.confirm(
-        "Are you sure you want to clear all fitness data? This action cannot be undone."
-      )
-    ) {
-      // Note: In a real app, you'd want to implement a clear data endpoint
+  const handleClearData = async () => {
+    if (!currentUser) return;
+    try {
+      await apiService.clearUserHistory(currentUser.id);
+
+      // Invalidate all relevant queries to refresh the UI immediately
+      queryClient.invalidateQueries({ queryKey: ["todaysActivity"] });
+      queryClient.invalidateQueries({ queryKey: ["dailyActivities"] });
+      queryClient.invalidateQueries({ queryKey: ["manualEntries"] });
+      queryClient.invalidateQueries({ queryKey: ["weeklyActivity"] });
+
       toast({
-        title: "Feature not implemented",
-        description: "Data clearing is not available in the current version.",
+        title: "All data cleared",
+        description:
+          "Your fitness history and manual entries have been deleted successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Clear failed",
+        description: error.message || "Failed to clear data. Please try again.",
         variant: "destructive",
       });
     }
   };
 
   const handleLogout = () => {
-    if (window.confirm("Are you sure you want to sign out?")) {
-      signOut();
-      navigate("/signin");
-    }
+    signOut();
+    navigate("/signin");
   };
 
   if (isLoading) {
@@ -124,28 +142,6 @@ export const Settings = () => {
           </p>
         )}
       </div>
-
-      {/* Theme Settings */}
-      <Card className="mb-6 shadow-card">
-        <div className="p-4 border-b border-border">
-          <div className="flex items-center gap-2">
-            <Palette className="w-5 h-5 text-primary" />
-            <h2 className="font-semibold text-foreground">Theme</h2>
-          </div>
-        </div>
-
-        <div className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-medium text-foreground">Appearance</h3>
-              <p className="text-sm text-muted-foreground">
-                Switch between dark and light mode
-              </p>
-            </div>
-            <ThemeToggle />
-          </div>
-        </div>
-      </Card>
 
       {/* Goal Settings */}
       <Card className="mb-6 shadow-card">
@@ -310,15 +306,33 @@ export const Settings = () => {
               Clear all fitness data including history and manual entries. This
               action cannot be undone.
             </p>
-            <Button
-              onClick={handleClearData}
-              variant="destructive"
-              size="sm"
-              className="w-full"
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Clear All Data
-            </Button>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm" className="w-full">
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Clear All Data
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Clear all fitness data?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently remove your history and manual
+                    entries. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleClearData}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Yes, clear everything
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </Card>
 
@@ -328,15 +342,33 @@ export const Settings = () => {
             <p className="text-sm text-muted-foreground mb-4">
               Sign out of your account. You can sign back in anytime.
             </p>
-            <Button
-              onClick={handleLogout}
-              variant="outline"
-              size="sm"
-              className="w-full border-orange-200 text-orange-600 hover:bg-orange-50 dark:border-orange-800 dark:text-orange-400 dark:hover:bg-orange-950"
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign Out
-            </Button>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full border-orange-200 text-orange-600 hover:bg-orange-50 dark:border-orange-800 dark:text-orange-400 dark:hover:bg-orange-950"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sign Out
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Sign out?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    You will be returned to the sign-in screen.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleLogout}>
+                    Yes, sign me out
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </Card>
       </div>

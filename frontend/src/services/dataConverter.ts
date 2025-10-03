@@ -22,14 +22,17 @@ export class DataConverter {
 
   // Convert frontend UserProfile to backend User update data
   static profileToUserUpdate(profile: UserProfile, userId: number): Partial<User> {
-    return {
-      id: userId,
-      step_goal: profile.stepGoal,
-      weight: profile.weight,
-      height: profile.height,
-      age: profile.age,
-      gender: profile.gender === 'male' ? 'M' : profile.gender === 'female' ? 'F' : 'O',
-    };
+    const updateData: Partial<User> = {};
+    
+    if (profile.stepGoal !== undefined) updateData.step_goal = profile.stepGoal;
+    if (profile.weight !== undefined) updateData.weight = profile.weight;
+    if (profile.height !== undefined) updateData.height = profile.height;
+    if (profile.age !== undefined) updateData.age = profile.age;
+    if (profile.gender !== undefined) {
+      updateData.gender = profile.gender === 'male' ? 'M' : profile.gender === 'female' ? 'F' : 'O';
+    }
+    
+    return updateData;
   }
 
   // Convert backend ManualEntry to frontend ManualEntryUI
@@ -44,9 +47,9 @@ export class DataConverter {
   }
 
   // Convert frontend ManualEntryUI to backend ManualEntry
-  static manualEntryUIToBackend(entry: ManualEntryUI, dailyActivityId: number): Partial<ManualEntry> {
+  static manualEntryUIToBackend(entry: ManualEntryUI, userId: number): Partial<ManualEntry> {
     return {
-      daily_activity: dailyActivityId,
+      user: userId,
       activity: entry.activity,
       duration: entry.duration || undefined,
       calories: entry.calories,

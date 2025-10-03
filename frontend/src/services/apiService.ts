@@ -1,6 +1,6 @@
-import { User, DailyActivity, ManualEntry, AuthUser } from '@/types/fitness';
+import { User, DailyActivity, ManualEntry, AuthUser, LoginRequest } from '@/types/fitness';
 
-const API_BASE_URL = 'http://localhost:8000/api';
+const API_BASE_URL = 'http://127.0.0.1:8000/api';
 
 class ApiService {
   private async request<T>(
@@ -26,63 +26,51 @@ class ApiService {
     return response.json();
   }
 
+  // Authentication (explicit absolute URL per requirement)
+  async authenticateUser(loginData: LoginRequest): Promise<User> {
+    const url = 'http://127.0.0.1:8000/api/login/';
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(loginData),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || errorData.message || `HTTP ${response.status}`);
+    }
+    return response.json();
+  }
+
   // User endpoints
   async getUsers(): Promise<User[]> {
-    return this.request<User[]>('/users/');
+    return this.request<User[]>('/add-user/');
   }
 
   async createUser(userData: Partial<User>): Promise<User> {
-    return this.request<User>('/users/', {
+    return this.request<User>('/add-user/', {
       method: 'POST',
       body: JSON.stringify(userData),
     });
   }
 
   async getUser(id: number): Promise<User> {
-    return this.request<User>(`/users/${id}/`);
+    return this.request<User>(`/update-user/${id}/`);
   }
 
   async updateUser(id: number, userData: Partial<User>): Promise<User> {
-    return this.request<User>(`/users/${id}/`, {
-      method: 'PUT',
+    return this.request<User>(`/update-user/${id}/`, {
+      method: 'PATCH',
       body: JSON.stringify(userData),
     });
   }
 
-  async deleteUser(id: number): Promise<void> {
-    return this.request<void>(`/users/${id}/`, {
-      method: 'DELETE',
-    });
-  }
-
-  async getUserActivities(userId: number): Promise<DailyActivity[]> {
-    return this.request<DailyActivity[]>(`/users/${userId}/activities/`);
-  }
-
-  async getUserRecentActivities(userId: number): Promise<DailyActivity[]> {
-    return this.request<DailyActivity[]>(`/users/${userId}/recent/`);
+  async getWeeklyActivity(userId: number): Promise<{ average_steps: number; average_distance: number; average_calories: number; total_calories: number; }> {
+    return this.request(`/weekly-activity/${userId}/`);
   }
 
   // Daily Activity endpoints
-  async getDailyActivities(params?: {
-    user_id?: number;
-    date?: string;
-    start_date?: string;
-    end_date?: string;
-  }): Promise<DailyActivity[]> {
-    const searchParams = new URLSearchParams();
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined) {
-          searchParams.append(key, value.toString());
-        }
-      });
-    }
-    
-    const queryString = searchParams.toString();
-    const endpoint = queryString ? `/daily-activities/?${queryString}` : '/daily-activities/';
-    
-    return this.request<DailyActivity[]>(endpoint);
+  async getDailyActivities(): Promise<DailyActivity[]> {
+    return this.request<DailyActivity[]>('/daily-activity/');
   }
 
   async createDailyActivity(activityData: {
@@ -92,109 +80,91 @@ class ApiService {
     distance: number;
     calories: number;
   }): Promise<DailyActivity> {
-    return this.request<DailyActivity>('/daily-activities/', {
+    return this.request<DailyActivity>('/daily-activity/', {
       method: 'POST',
       body: JSON.stringify(activityData),
     });
   }
 
   async getDailyActivity(id: number): Promise<DailyActivity> {
-    return this.request<DailyActivity>(`/daily-activities/${id}/`);
+    return this.request<DailyActivity>(`/daily-activity/${id}/`);
   }
 
   async updateDailyActivity(id: number, activityData: Partial<DailyActivity>): Promise<DailyActivity> {
-    return this.request<DailyActivity>(`/daily-activities/${id}/`, {
-      method: 'PUT',
+    return this.request<DailyActivity>(`/daily-activity/${id}/`, {
+      method: 'PATCH',
       body: JSON.stringify(activityData),
     });
   }
 
   async deleteDailyActivity(id: number): Promise<void> {
-    return this.request<void>(`/daily-activities/${id}/`, {
+    return this.request<void>(`/daily-activity/${id}/`, {
       method: 'DELETE',
     });
   }
 
+  async getDailyActivitiesByUser(userId: number): Promise<DailyActivity[]> {
+    return this.request<DailyActivity[]>(`/daily-activity/user/${userId}/`);
+  }
+
   async getDailyActivitiesByDateRange(startDate: string, endDate: string): Promise<DailyActivity[]> {
-    return this.request<DailyActivity[]>(`/daily-activities/by-date-range/?start_date=${startDate}&end_date=${endDate}`);
+    // For now, get all activities and filter on the frontend
+    // In a real app, you'd want a backend endpoint for date range filtering
+    const activities = await this.getDailyActivities();
+    return activities.filter(activity => 
+      activity.date >= startDate && activity.date <= endDate
+    );
   }
 
   // Manual Entry endpoints
-  async getManualEntries(params?: {
-    daily_activity_id?: number;
-    activity?: string;
-    user_id?: number;
-    activity_type?: string;
-  }): Promise<ManualEntry[]> {
-    const searchParams = new URLSearchParams();
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined) {
-          searchParams.append(key, value.toString());
-        }
-      });
-    }
-    
-    const queryString = searchParams.toString();
-    const endpoint = queryString ? `/manual-entries/?${queryString}` : '/manual-entries/';
-    
-    return this.request<ManualEntry[]>(endpoint);
+  async getManualEntries(): Promise<ManualEntry[]> {
+    return this.request<ManualEntry[]>('/manual-entry/');
   }
 
   async createManualEntry(entryData: {
-    daily_activity: number;
+    user: number;
+    date: string;
     activity: string;
     duration?: number;
     calories: number;
   }): Promise<ManualEntry> {
-    return this.request<ManualEntry>('/manual-entries/', {
+    return this.request<ManualEntry>('/manual-entry/', {
       method: 'POST',
       body: JSON.stringify(entryData),
     });
   }
 
   async getManualEntry(id: number): Promise<ManualEntry> {
-    return this.request<ManualEntry>(`/manual-entries/${id}/`);
+    return this.request<ManualEntry>(`/manual-entry/${id}/`);
   }
 
   async updateManualEntry(id: number, entryData: Partial<ManualEntry>): Promise<ManualEntry> {
-    return this.request<ManualEntry>(`/manual-entries/${id}/`, {
-      method: 'PUT',
+    return this.request<ManualEntry>(`/manual-entry/${id}/`, {
+      method: 'PATCH',
       body: JSON.stringify(entryData),
     });
   }
 
   async deleteManualEntry(id: number): Promise<void> {
-    return this.request<void>(`/manual-entries/${id}/`, {
+    return this.request<void>(`/manual-entry/${id}/`, {
       method: 'DELETE',
     });
   }
 
   async getManualEntriesByUser(userId: number): Promise<ManualEntry[]> {
-    return this.request<ManualEntry[]>(`/manual-entries/by-user/?user_id=${userId}`);
+    return this.request<ManualEntry[]>(`/manual-entry/user/${userId}/`);
   }
 
-  async getManualEntriesByActivityType(activityType: string): Promise<ManualEntry[]> {
-    return this.request<ManualEntry[]>(`/manual-entries/by-activity-type/?activity_type=${activityType}`);
-  }
-
-  // Utility methods
-  async getUsersByUsername(username: string): Promise<User[]> {
-    return this.request<User[]>(`/users/?username=${encodeURIComponent(username)}`);
-  }
-
+  // Helpers adapted to current backend
   async getTodayActivity(userId: number): Promise<DailyActivity | null> {
     const today = new Date().toISOString().split('T')[0];
-    const activities = await this.getDailyActivities({
-      user_id: userId,
-      date: today,
-    });
-    return activities.length > 0 ? activities[0] : null;
+    const activities = await this.getDailyActivitiesByUser(userId);
+    const todayActivity = activities.find(a => a.date === today) || null;
+    return todayActivity;
   }
 
   async getOrCreateTodayActivity(userId: number): Promise<DailyActivity> {
     let activity = await this.getTodayActivity(userId);
-    
     if (!activity) {
       activity = await this.createDailyActivity({
         user: userId,
@@ -204,8 +174,13 @@ class ApiService {
         calories: 0,
       });
     }
-    
     return activity;
+  }
+
+  async clearUserHistory(userId: number): Promise<void> {
+    await this.request<void>(`/delete-activity/${userId}/`, {
+      method: 'DELETE',
+    });
   }
 }
 

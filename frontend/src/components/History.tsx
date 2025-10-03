@@ -1,33 +1,54 @@
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, TrendingUp, Calendar, Loader2 } from "lucide-react";
+import {
+  Download,
+  TrendingUp,
+  Calendar,
+  Loader2,
+  Activity,
+} from "lucide-react";
 import { useFitness } from "@/contexts/FitnessContext";
 import { DataConverter } from "@/services/dataConverter";
+import { apiService } from "@/services/apiService";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { DailyActivityUI } from "@/types/fitness";
+import { DailyActivityUI, DailyActivity, ManualEntry } from "@/types/fitness";
 
 export const History = () => {
-  const { getRecentActivities, isAuthenticated, isLoading } = useFitness();
+  const { getRecentActivities, isAuthenticated, isLoading, currentUser } =
+    useFitness();
   const [historyData, setHistoryData] = useState<DailyActivityUI[]>([]);
   const [selectedDay, setSelectedDay] = useState<DailyActivityUI | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [weeklyStats, setWeeklyStats] = useState<{
+    average_steps: number;
+    average_distance: number;
+    average_calories: number;
+    total_calories: number;
+  } | null>(null);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && currentUser) {
       loadHistoryData();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, currentUser]);
 
   const loadHistoryData = async () => {
+    if (!currentUser) return;
+
     setLoading(true);
     try {
+      // Fetch weekly stats
+      const weeklyData = await apiService.getWeeklyActivity(currentUser.id);
+      setWeeklyStats(weeklyData);
+
+      // Also get the formatted history data for backward compatibility
       const data = await getRecentActivities(7);
       setHistoryData(data);
     } catch (error) {
@@ -51,7 +72,7 @@ export const History = () => {
 
     historyData.forEach((day) => {
       const manualEntriesCount = day.manualEntries.length;
-      const distanceKm = DataConverter.metersToKilometers(day.distance);
+      const distanceKm = day.distance; // Distance is already in km
       const totalCalories = DataConverter.calculateTotalCalories(day);
 
       csvRows.push(
@@ -122,53 +143,40 @@ export const History = () => {
         </Button>
       </div>
 
-      {/* Summary Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        {historyData.length > 0 && (
-          <>
-            <Card className="p-4 shadow-card">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-steps mb-1">
-                  {Math.round(
-                    historyData.reduce((sum, d) => sum + d.steps, 0) /
-                      historyData.length
-                  ).toLocaleString()}
-                </div>
-                <p className="text-xs text-muted-foreground">avg steps</p>
+      {/* Weekly Summary Stats from API */}
+      {weeklyStats && (
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          <Card className="p-4 shadow-card">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-steps mb-1">
+                {Math.round(weeklyStats.average_steps).toLocaleString()}
               </div>
-            </Card>
+              <p className="text-xs text-muted-foreground">avg steps</p>
+            </div>
+          </Card>
 
-            <Card className="p-4 shadow-card">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-calories mb-1">
-                  {Math.round(
-                    historyData.reduce(
-                      (sum, d) => sum + DataConverter.calculateTotalCalories(d),
-                      0
-                    ) / historyData.length
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">avg calories</p>
+          <Card className="p-4 shadow-card">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-calories mb-1">
+                {Math.round(weeklyStats.average_calories)}
               </div>
-            </Card>
+              <p className="text-xs text-muted-foreground">avg calories</p>
+            </div>
+          </Card>
 
-            <Card className="p-4 shadow-card">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-distance mb-1">
-                  {DataConverter.metersToKilometers(
-                    historyData.reduce((sum, d) => sum + d.distance, 0) /
-                      historyData.length
-                  ).toFixed(1)}
-                </div>
-                <p className="text-xs text-muted-foreground">avg km</p>
+          <Card className="p-4 shadow-card">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-distance mb-1">
+                {weeklyStats.average_distance.toFixed(1)}
               </div>
-            </Card>
-          </>
-        )}
-      </div>
+              <p className="text-xs text-muted-foreground">avg km</p>
+            </div>
+          </Card>
+        </div>
+      )}
 
-      {/* Total Calories (includes manual activities) */}
-      {historyData.length > 0 && (
+      {/* Total Calories from API */}
+      {weeklyStats && (
         <div className="mb-6">
           <Card className="p-4 shadow-card">
             <div className="flex items-center justify-between">
@@ -176,19 +184,21 @@ export const History = () => {
                 Total calories (last 7 days)
               </p>
               <p className="text-xl font-bold text-calories">
-                {totalCalories.toLocaleString()} cal
+                {weeklyStats.total_calories.toLocaleString()} cal
               </p>
             </div>
           </Card>
         </div>
       )}
 
-      {/* Daily History */}
-      <Card className="shadow-card">
+      {/* Legacy Daily History (keeping for backward compatibility) */}
+      <Card className="shadow-card mt-6">
         <div className="p-4 border-b border-border">
           <div className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-primary" />
-            <h2 className="font-semibold text-foreground">Daily Activity</h2>
+            <h2 className="font-semibold text-foreground">
+              Daily Activity (Legacy View)
+            </h2>
           </div>
         </div>
 
@@ -248,12 +258,7 @@ export const History = () => {
                         <span>
                           {DataConverter.calculateTotalCalories(day)} cal
                         </span>
-                        <span>
-                          {DataConverter.metersToKilometers(
-                            day.distance
-                          ).toFixed(1)}{" "}
-                          km
-                        </span>
+                        <span>{day.distance.toFixed(1)} km</span>
                         {day.manualEntries.length > 0 && (
                           <span>{day.manualEntries.length} activities</span>
                         )}
@@ -324,10 +329,7 @@ export const History = () => {
                 <Card className="p-3">
                   <div className="text-xs text-muted-foreground">Distance</div>
                   <div className="text-lg font-semibold text-distance">
-                    {DataConverter.metersToKilometers(
-                      selectedDay.distance
-                    ).toFixed(2)}{" "}
-                    km
+                    {selectedDay.distance.toFixed(2)} km
                   </div>
                 </Card>
               </div>
