@@ -72,16 +72,24 @@ export const FitnessProvider: React.FC<FitnessProviderProps> = ({
   // State to track current user ID for reactive queries
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  // Check for stored user on mount
+  // Check for stored user on mount and control initialization timing
   useEffect(() => {
     const storedUserId = localStorage.getItem("currentUserId");
     if (storedUserId) {
       setCurrentUserId(storedUserId);
+      // Keep initializing until the first user query completes
+      return;
     }
-    // Mark initialization complete; if a user exists, the user query will load next
+    // No stored user; we can finish initialization immediately
     setAuthInitializing(false);
-    // No auto-login - users must sign up or sign in manually
   }, []);
+
+  // When there is a stored user, finish initialization only after the user query resolves
+  useEffect(() => {
+    if (currentUserId && !userLoading) {
+      setAuthInitializing(false);
+    }
+  }, [currentUserId, userLoading]);
 
   // Query for current user data
   const { data: userData, isLoading: userLoading } = useQuery({
