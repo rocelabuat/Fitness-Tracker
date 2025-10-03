@@ -6,7 +6,6 @@ import React, {
   ReactNode,
 } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { localStorageService as localApi } from "@/services/localStorageService";
 import { apiService } from "@/services/apiService";
 import { DataConverter } from "@/services/dataConverter";
 import {
@@ -65,6 +64,8 @@ export const FitnessProvider: React.FC<FitnessProviderProps> = ({
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // Prevent premature redirects before we read localStorage
+  const [authInitializing, setAuthInitializing] = useState(true);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -77,6 +78,8 @@ export const FitnessProvider: React.FC<FitnessProviderProps> = ({
     if (storedUserId) {
       setCurrentUserId(storedUserId);
     }
+    // Mark initialization complete; if a user exists, the user query will load next
+    setAuthInitializing(false);
     // No auto-login - users must sign up or sign in manually
   }, []);
 
@@ -381,7 +384,8 @@ export const FitnessProvider: React.FC<FitnessProviderProps> = ({
   const contextValue: FitnessContextType = {
     currentUser,
     userProfile,
-    isLoading: userLoading,
+    // Expose loading as true while initializing or while fetching user
+    isLoading: authInitializing || userLoading,
     isAuthenticated,
     todaysActivity,
     signIn,

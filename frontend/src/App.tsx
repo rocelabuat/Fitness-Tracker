@@ -1,5 +1,11 @@
-import { useState } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import {
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -38,7 +44,24 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
 
 const FitnessApp: React.FC = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
+  const location = useLocation();
+  const navigate = useNavigate();
   const [showManualEntry, setShowManualEntry] = useState(false);
+
+  // Keep active tab in sync with the current pathname
+  useEffect(() => {
+    const path = location.pathname.split("/")[1] || "dashboard";
+    if (path === "dashboard" || path === "history" || path === "settings") {
+      setActiveTab(path);
+    } else {
+      setActiveTab("dashboard");
+    }
+  }, [location.pathname]);
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    navigate(`/${tab}`);
+  };
 
   const renderActiveTab = () => {
     switch (activeTab) {
@@ -56,7 +79,7 @@ const FitnessApp: React.FC = () => {
   return (
     <div className="min-h-screen bg-background">
       {renderActiveTab()}
-      <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
+      <Navigation activeTab={activeTab} onTabChange={handleTabChange} />
       {showManualEntry && (
         <ManualEntry onClose={() => setShowManualEntry(false)} />
       )}
@@ -75,6 +98,22 @@ const App = () => {
               <Route path="/signup" element={<SignUp />} />
               <Route
                 path="/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <FitnessApp />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/history"
+                element={
+                  <ProtectedRoute>
+                    <FitnessApp />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/settings"
                 element={
                   <ProtectedRoute>
                     <FitnessApp />
