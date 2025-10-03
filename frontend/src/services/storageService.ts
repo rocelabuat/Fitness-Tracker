@@ -1,4 +1,4 @@
-import { FitnessData, DailyActivity, UserProfile, ManualEntry } from '../types/fitness';
+import { FitnessData, DailyActivityUI, UserProfile, ManualEntryUI } from '../types/fitness';
 
 const STORAGE_KEY = 'fitness-tracker-data';
 
@@ -54,7 +54,7 @@ export class StorageService {
     this.saveData();
   }
 
-  getTodaysActivity(): DailyActivity {
+  getTodaysActivity(): DailyActivityUI {
     const today = new Date().toDateString();
     let activity = this.data.activities.find(a => a.date === today);
     
@@ -80,18 +80,20 @@ export class StorageService {
     this.saveData();
   }
 
-  addManualEntry(entry: Omit<ManualEntry, 'id'>) {
+  addManualEntry(entry: Omit<ManualEntryUI, 'id'>) {
     const activity = this.getTodaysActivity();
-    const newEntry: ManualEntry = {
+    const newEntry: ManualEntryUI = {
       ...entry,
       id: Date.now().toString(),
+      // ensure timestamp exists for UI entries
+      timestamp: (entry as Partial<ManualEntryUI>).timestamp ?? Date.now(),
     };
     activity.manualEntries.push(newEntry);
     activity.calories += entry.calories;
     this.saveData();
   }
 
-  getHistoryData(days = 7): DailyActivity[] {
+  getHistoryData(days = 7): DailyActivityUI[] {
     return this.data.activities
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, days);
